@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daily Work Schedule - MyTurn</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -21,6 +23,11 @@
                         <option value="">-- Select Service --</option>
                     </select>
                     <button class="btn-next" id="nextWorkerBtn">Next</button>
+                </div>
+                <div class="export-controls">
+                    <button class="btn-export" id="exportPdfBtn" title="Export to PDF">
+                        <span class="export-icon">📄</span> Export PDF
+                    </button>
                 </div>
                 <button class="btn-nav" id="nextDayBtn" title="Next Day">
                     <span class="arrow">→</span>
@@ -56,21 +63,6 @@
                     <!-- Rows will be populated by JavaScript -->
                 </tbody>
             </table>
-        </div>
-
-        <div class="controls-section">
-            <div class="control-group">
-                <h3>Service Legend</h3>
-                <div class="legend" id="serviceLegend">
-                    <!-- Service legend will be populated by JavaScript -->
-                </div>
-            </div>
-            <div class="control-group">
-                <h3>Actions</h3>
-                <button class="btn-action" id="highlightAllBtn">Highlight All Workers</button>
-                <button class="btn-action" id="clearHighlightsBtn">Clear Highlights</button>
-                <button class="btn-action" id="printBtn">Print Schedule</button>
-            </div>
         </div>
     </div>
 

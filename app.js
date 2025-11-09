@@ -46,7 +46,6 @@ function init() {
     updateDateDisplay();
     loadScheduleFromStorage();
     renderSchedule();
-    renderServiceLegend();
     setupEventListeners();
 }
 
@@ -75,7 +74,8 @@ function updateDateDisplay() {
     const dayName = days[currentDate.getDay()];
     const month = currentDate.getMonth() + 1;
     const day = currentDate.getDate();
-    document.getElementById('dateDisplay').textContent = `${dayName} ${month}/${day}`;
+    const year = currentDate.getFullYear();
+    document.getElementById('dateDisplay').textContent = `${dayName} ${month}/${day}/${year}`;
 }
 
 // Render schedule table
@@ -169,22 +169,100 @@ function renderSchedule() {
             const serviceCodeBottom = storedData[`service${i}_bottom`] || '';
             const fullService = storedData[`service${i}_full`] || '';
             
+            // Check if there's a half-weight service (30 minutes)
+            const hasHalfWeightService = (serviceCodeTop && services[serviceCodeTop] && services[serviceCodeTop].duration === 30) ||
+                                        (serviceCodeBottom && services[serviceCodeBottom] && services[serviceCodeBottom].duration === 30);
+            
             // Create diagonal line (only visible when there's a half-weight service)
             const diagonalLine = document.createElement('div');
             diagonalLine.className = 'service-diagonal-line';
-            // Only show diagonal if there's a half-weight service (top or bottom)
-            if (serviceCodeTop || serviceCodeBottom) {
+            // Only show diagonal if there's a half-weight service
+            if (hasHalfWeightService) {
                 diagonalLine.style.display = 'block';
             } else {
                 diagonalLine.style.display = 'none';
             }
             serviceCell.appendChild(diagonalLine);
             
+            // Create a single unified input cell (shown when empty or for full-weight services)
+            const unifiedCell = document.createElement('div');
+            unifiedCell.className = 'service-cell-unified';
+            if (fullService) {
+                unifiedCell.textContent = fullService;
+                unifiedCell.style.fontWeight = 'bold';
+                unifiedCell.style.color = '#667eea';
+            } else if (!serviceCodeTop && !serviceCodeBottom) {
+                // Empty cell - show as unified editable cell
+                unifiedCell.textContent = '';
+            } else {
+                // Has half-weight service(s) - hide unified, will show split below
+                unifiedCell.style.display = 'none';
+            }
+            unifiedCell.contentEditable = true;
+            unifiedCell.addEventListener('focus', (e) => {
+                // If cell is empty and a service is selected, populate with service code
+                if (!e.target.textContent.trim()) {
+                    if (selectedService) {
+                        // Populate with selected service code
+                        e.target.textContent = selectedService;
+                        // Select all text so user can easily replace or delete
+                        setTimeout(() => {
+                            const range = document.createRange();
+                            const selection = window.getSelection();
+                            range.selectNodeContents(e.target);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                        }, 0);
+                    } else {
+                        // No service selected - position cursor in center
+                        requestAnimationFrame(() => {
+                            const zwsp = '\u200B';
+                            if (!e.target.textContent) {
+                                e.target.textContent = zwsp;
+                            }
+                            setTimeout(() => {
+                                const range = document.createRange();
+                                const selection = window.getSelection();
+                                if (e.target.firstChild && e.target.firstChild.nodeType === Node.TEXT_NODE) {
+                                    range.setStart(e.target.firstChild, 1);
+                                } else {
+                                    range.setStart(e.target, 1);
+                                }
+                                range.collapse(true);
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                            }, 10);
+                        });
+                    }
+                }
+            });
+            unifiedCell.addEventListener('input', (e) => {
+                // Remove zero-width space when user types
+                if (e.target.textContent === '\u200B') {
+                    e.target.textContent = '';
+                } else if (e.target.textContent.startsWith('\u200B')) {
+                    e.target.textContent = e.target.textContent.replace('\u200B', '');
+                }
+            });
+            unifiedCell.addEventListener('blur', (e) => {
+                // Remove zero-width space and get the actual code
+                let code = e.target.textContent.replace(/\u200B/g, '').trim().toUpperCase();
+                e.target.textContent = code; // Update display immediately with capitalized version
+                handleServiceInput(rowNumber, i, code, 'unified');
+                renderSchedule(); // Re-render to update display
+            });
+            unifiedCell.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.target.blur();
+                }
+            });
+            
             // Create top triangle (upper left) - for 1/2 weight services
             const topHalf = document.createElement('div');
             topHalf.className = 'service-cell-top';
-            if (fullService) {
-                // Full service exists - hide top triangle
+            if (fullService || (!serviceCodeTop && !serviceCodeBottom)) {
+                // Full service or empty - hide top triangle
                 topHalf.style.display = 'none';
             } else {
                 topHalf.textContent = serviceCodeTop;
@@ -194,11 +272,46 @@ function renderSchedule() {
                 }
             }
             topHalf.contentEditable = true;
+            // Store original value to preserve it if user doesn't make changes
+            const originalTopValue = serviceCodeTop || '';
+            topHalf.addEventListener('focus', (e) => {
+                // Store the original value when focusing
+                e.target.dataset.originalValue = e.target.textContent.trim();
+                
+                // If cell is empty and a half-weight service is selected, populate with service code
+                if (!e.target.textContent.trim()) {
+                    if (selectedService && services[selectedService] && services[selectedService].duration === 30) {
+                        // Only populate if it's a half-weight service (30 minutes)
+                        e.target.textContent = selectedService;
+                        // Select all text so user can easily replace or delete
+                        setTimeout(() => {
+                            const range = document.createRange();
+                            const selection = window.getSelection();
+                            range.selectNodeContents(e.target);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                        }, 0);
+                    }
+                }
+            });
             topHalf.addEventListener('blur', (e) => {
-                const code = e.target.textContent.trim().toUpperCase();
-                e.target.textContent = code; // Update display immediately with capitalized version
-                handleServiceInput(rowNumber, i, code, 'top');
-                renderSchedule(); // Re-render to update display
+                let code = e.target.textContent.trim().toUpperCase();
+                const originalValue = e.target.dataset.originalValue || '';
+                
+                // If code is empty but there was original data, restore it
+                if (!code && originalValue) {
+                    code = originalValue.toUpperCase();
+                }
+                
+                // Only update if the value actually changed
+                if (code !== originalValue.toUpperCase()) {
+                    e.target.textContent = code; // Update display immediately with capitalized version
+                    handleServiceInput(rowNumber, i, code, 'top');
+                    renderSchedule(); // Re-render to update display
+                } else {
+                    // Value didn't change, just update display to ensure capitalization
+                    e.target.textContent = code;
+                }
             });
             topHalf.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
@@ -210,8 +323,8 @@ function renderSchedule() {
             // Create bottom triangle (lower right) - for 1/2 weight services
             const bottomHalf = document.createElement('div');
             bottomHalf.className = 'service-cell-bottom';
-            if (fullService) {
-                // Full service exists - hide bottom triangle
+            if (fullService || (!serviceCodeTop && !serviceCodeBottom)) {
+                // Full service or empty - hide bottom triangle
                 bottomHalf.style.display = 'none';
             } else {
                 bottomHalf.textContent = serviceCodeBottom;
@@ -221,11 +334,46 @@ function renderSchedule() {
                 }
             }
             bottomHalf.contentEditable = true;
+            // Store original value to preserve it if user doesn't make changes
+            const originalBottomValue = serviceCodeBottom || '';
+            bottomHalf.addEventListener('focus', (e) => {
+                // Store the original value when focusing
+                e.target.dataset.originalValue = e.target.textContent.trim();
+                
+                // If cell is empty and a half-weight service is selected, populate with service code
+                if (!e.target.textContent.trim()) {
+                    if (selectedService && services[selectedService] && services[selectedService].duration === 30) {
+                        // Only populate if it's a half-weight service (30 minutes)
+                        e.target.textContent = selectedService;
+                        // Select all text so user can easily replace or delete
+                        setTimeout(() => {
+                            const range = document.createRange();
+                            const selection = window.getSelection();
+                            range.selectNodeContents(e.target);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                        }, 0);
+                    }
+                }
+            });
             bottomHalf.addEventListener('blur', (e) => {
-                const code = e.target.textContent.trim().toUpperCase();
-                e.target.textContent = code; // Update display immediately with capitalized version
-                handleServiceInput(rowNumber, i, code, 'bottom');
-                renderSchedule(); // Re-render to update display
+                let code = e.target.textContent.trim().toUpperCase();
+                const originalValue = e.target.dataset.originalValue || '';
+                
+                // If code is empty but there was original data, restore it
+                if (!code && originalValue) {
+                    code = originalValue.toUpperCase();
+                }
+                
+                // Only update if the value actually changed
+                if (code !== originalValue.toUpperCase()) {
+                    e.target.textContent = code; // Update display immediately with capitalized version
+                    handleServiceInput(rowNumber, i, code, 'bottom');
+                    renderSchedule(); // Re-render to update display
+                } else {
+                    // Value didn't change, just update display to ensure capitalization
+                    e.target.textContent = code;
+                }
             });
             bottomHalf.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
@@ -234,33 +382,9 @@ function renderSchedule() {
                 }
             });
             
-            // Create centered full service display (for weight 1 services - 60 minutes)
-            const fullServiceDisplay = document.createElement('div');
-            fullServiceDisplay.className = 'service-cell-full';
-            if (fullService) {
-                fullServiceDisplay.textContent = fullService;
-                fullServiceDisplay.style.fontWeight = 'bold';
-                fullServiceDisplay.style.color = '#667eea';
-                fullServiceDisplay.contentEditable = true;
-                fullServiceDisplay.addEventListener('blur', (e) => {
-                    const code = e.target.textContent.trim().toUpperCase();
-                    e.target.textContent = code; // Update display immediately with capitalized version
-                    handleServiceInput(rowNumber, i, code, 'full');
-                    renderSchedule(); // Re-render to update display
-                });
-                fullServiceDisplay.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        e.target.blur();
-                    }
-                });
-            } else {
-                fullServiceDisplay.style.display = 'none';
-            }
-            
+            serviceCell.appendChild(unifiedCell);
             serviceCell.appendChild(topHalf);
             serviceCell.appendChild(bottomHalf);
-            serviceCell.appendChild(fullServiceDisplay);
             row.appendChild(serviceCell);
         }
         
@@ -268,21 +392,6 @@ function renderSchedule() {
     }
 }
 
-// Render service legend
-function renderServiceLegend() {
-    const legend = document.getElementById('serviceLegend');
-    legend.innerHTML = '';
-
-    Object.entries(services).forEach(([code, service]) => {
-        const legendItem = document.createElement('div');
-        legendItem.className = 'legend-item';
-        legendItem.innerHTML = `
-            <span class="legend-code">${code}</span>
-            <span class="legend-name">${service.name}</span>
-        `;
-        legend.appendChild(legendItem);
-    });
-}
 
 // Toggle worker highlight
 function toggleHighlight(workerName) {
@@ -323,12 +432,17 @@ function handleServiceInput(rowNumber, columnNumber, serviceCode, half) {
     }
     
     if (!serviceCode) {
-        // Empty - clear only the specified half
+        // Empty - only clear the specific half being edited, not both halves
         if (half === 'top') {
             scheduleData[rowKey][`service${columnNumber}_top`] = '';
+            // Don't clear bottom or full - preserve them
         } else if (half === 'bottom') {
             scheduleData[rowKey][`service${columnNumber}_bottom`] = '';
-        } else if (half === 'full') {
+            // Don't clear top or full - preserve them
+        } else {
+            // For unified or full, clear everything
+            scheduleData[rowKey][`service${columnNumber}_top`] = '';
+            scheduleData[rowKey][`service${columnNumber}_bottom`] = '';
             scheduleData[rowKey][`service${columnNumber}_full`] = '';
         }
         saveScheduleToStorage();
@@ -356,6 +470,10 @@ function handleServiceInput(rowNumber, columnNumber, serviceCode, half) {
             } else if (half === 'bottom') {
                 scheduleData[rowKey][`service${columnNumber}_bottom`] = serviceCode;
                 // Don't clear top - allow both halves to have services
+            } else if (half === 'unified') {
+                // User entered in unified cell - put in top half
+                scheduleData[rowKey][`service${columnNumber}_top`] = serviceCode;
+                scheduleData[rowKey][`service${columnNumber}_bottom`] = '';
             } else if (half === 'full') {
                 // If editing a full service and changing to half, put in top
                 scheduleData[rowKey][`service${columnNumber}_top`] = serviceCode;
@@ -449,13 +567,11 @@ function navigateToPreviousDay() {
     const prevDate = new Date(currentDate);
     prevDate.setDate(prevDate.getDate() - 1);
     
-    if (hasScheduleDataForDate(prevDate)) {
-        currentDate = prevDate;
-        updateDateDisplay();
-        scheduleData = loadScheduleForDate(currentDate);
-        renderSchedule();
-        updateNavigationButtons();
-    }
+    currentDate = prevDate;
+    updateDateDisplay();
+    scheduleData = loadScheduleForDate(currentDate);
+    renderSchedule();
+    updateNavigationButtons();
 }
 
 // Navigate to next day
@@ -463,46 +579,26 @@ function navigateToNextDay() {
     const nextDate = new Date(currentDate);
     nextDate.setDate(nextDate.getDate() + 1);
     
-    if (hasScheduleDataForDate(nextDate)) {
-        currentDate = nextDate;
-        updateDateDisplay();
-        scheduleData = loadScheduleForDate(currentDate);
-        renderSchedule();
-        updateNavigationButtons();
-    }
+    currentDate = nextDate;
+    updateDateDisplay();
+    scheduleData = loadScheduleForDate(currentDate);
+    renderSchedule();
+    updateNavigationButtons();
 }
 
-// Update navigation buttons state
+// Update navigation buttons state (always enabled)
 function updateNavigationButtons() {
-    // Update previous day button
-    const prevDate = new Date(currentDate);
-    prevDate.setDate(prevDate.getDate() - 1);
-    
+    // Both buttons are always enabled
     const prevDayBtn = document.getElementById('prevDayBtn');
-    if (hasScheduleDataForDate(prevDate)) {
-        prevDayBtn.disabled = false;
-        prevDayBtn.style.opacity = '1';
-        prevDayBtn.style.cursor = 'pointer';
-    } else {
-        prevDayBtn.disabled = true;
-        prevDayBtn.style.opacity = '0.5';
-        prevDayBtn.style.cursor = 'not-allowed';
-    }
-    
-    // Update next day button
-    const nextDate = new Date(currentDate);
-    nextDate.setDate(nextDate.getDate() + 1);
-    
     const nextDayBtn = document.getElementById('nextDayBtn');
-    if (hasScheduleDataForDate(nextDate)) {
-        nextDayBtn.disabled = false;
-        nextDayBtn.style.opacity = '1';
-        nextDayBtn.style.cursor = 'pointer';
-    } else {
-        nextDayBtn.disabled = true;
-        nextDayBtn.style.opacity = '0.5';
-        nextDayBtn.style.cursor = 'not-allowed';
-    }
+    
+    prevDayBtn.disabled = false;
+    prevDayBtn.style.opacity = '1';
+    prevDayBtn.style.cursor = 'pointer';
+    
+    nextDayBtn.disabled = false;
+    nextDayBtn.style.opacity = '1';
+    nextDayBtn.style.cursor = 'pointer';
 }
 
 // Update previous day button state (legacy function name, redirects to updateNavigationButtons)
@@ -730,23 +826,68 @@ function setupEventListeners() {
         navigateToNextDay();
     });
     
-    // Highlight all workers
-    document.getElementById('highlightAllBtn').addEventListener('click', () => {
-        Object.keys(workers).forEach(name => highlightedWorkers.add(name));
-        saveHighlightsToStorage();
-        renderSchedule();
+    // Export PDF button
+    document.getElementById('exportPdfBtn').addEventListener('click', () => {
+        exportToPDF();
     });
+}
+
+// Export schedule to PDF
+function exportToPDF() {
+    const { jsPDF } = window.jspdf;
+    const scheduleContainer = document.querySelector('.schedule-container');
+    const dateDisplay = document.getElementById('dateDisplay').textContent;
     
-    // Clear highlights
-    document.getElementById('clearHighlightsBtn').addEventListener('click', () => {
-        highlightedWorkers.clear();
-        saveHighlightsToStorage();
-        renderSchedule();
-    });
+    // Show loading state
+    const exportBtn = document.getElementById('exportPdfBtn');
+    const originalText = exportBtn.innerHTML;
+    exportBtn.innerHTML = '<span class="export-icon">⏳</span> Exporting...';
+    exportBtn.disabled = true;
     
-    // Print schedule
-    document.getElementById('printBtn').addEventListener('click', () => {
-        window.print();
+    // Use html2canvas to capture the schedule table
+    html2canvas(scheduleContainer, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+    }).then((canvas) => {
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('landscape', 'mm', 'a4');
+        
+        // Get PDF dimensions
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        
+        // Calculate image dimensions to fit the page
+        const imgWidth = canvas.width;
+        const imgHeight = canvas.height;
+        const ratio = Math.min((pdfWidth - 20) / imgWidth, (pdfHeight - 40) / imgHeight);
+        const imgWidthPdf = imgWidth * ratio;
+        const imgHeightPdf = imgHeight * ratio;
+        
+        // Add title
+        pdf.setFontSize(16);
+        pdf.text('DAILY WORK SCHEDULE', pdfWidth / 2, 15, { align: 'center' });
+        pdf.setFontSize(12);
+        pdf.text(dateDisplay, pdfWidth / 2, 25, { align: 'center' });
+        
+        // Add the schedule image
+        pdf.addImage(imgData, 'PNG', (pdfWidth - imgWidthPdf) / 2, 30, imgWidthPdf, imgHeightPdf);
+        
+        // Save the PDF
+        const fileName = `Schedule_${dateDisplay.replace(/\s+/g, '_')}.pdf`;
+        pdf.save(fileName);
+        
+        // Restore button state
+        exportBtn.innerHTML = originalText;
+        exportBtn.disabled = false;
+    }).catch((error) => {
+        console.error('Error exporting to PDF:', error);
+        alert('Error exporting to PDF. Please try again.');
+        
+        // Restore button state
+        exportBtn.innerHTML = originalText;
+        exportBtn.disabled = false;
     });
 }
 
