@@ -39,6 +39,7 @@ let highlightedWorkers = new Set();
 let scheduleData = {}; // Store time in and service assignments
 let selectedService = '';
 let currentDate = new Date();
+let currentTooltipElement = null; // Track which element's tooltip is currently shown
 
 // Initialize the application
 function init() {
@@ -130,9 +131,41 @@ function renderSchedule() {
                 e.target.title = '';
             }
         });
-        nameCell.addEventListener('click', () => {
+        nameCell.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent event from bubbling to document
             const name = nameCell.textContent.trim();
-            if (name) {
+            if (name && workers[name]) {
+                const serviceCodes = workers[name].join(', ');
+                const tooltip = document.getElementById('workerTooltip');
+                
+                // If clicking the same cell, toggle tooltip
+                if (currentTooltipElement === nameCell) {
+                    tooltip.style.display = 'none';
+                    currentTooltipElement = null;
+                } else {
+                    // Show tooltip for this worker
+                    tooltip.textContent = serviceCodes;
+                    tooltip.style.display = 'block';
+                    
+                    // Position tooltip near the clicked cell
+                    const rect = nameCell.getBoundingClientRect();
+                    tooltip.style.left = `${rect.right + 10}px`;
+                    tooltip.style.top = `${rect.top}px`;
+                    
+                    // Adjust if tooltip goes off screen
+                    setTimeout(() => {
+                        const tooltipRect = tooltip.getBoundingClientRect();
+                        if (tooltipRect.right > window.innerWidth) {
+                            tooltip.style.left = `${rect.left - tooltipRect.width - 10}px`;
+                        }
+                        if (tooltipRect.bottom > window.innerHeight) {
+                            tooltip.style.top = `${window.innerHeight - tooltipRect.height - 10}px`;
+                        }
+                    }, 0);
+                    
+                    currentTooltipElement = nameCell;
+                }
+            } else if (name) {
                 toggleHighlight(name);
             }
         });
@@ -829,6 +862,18 @@ function setupEventListeners() {
     // Export PDF button
     document.getElementById('exportPdfBtn').addEventListener('click', () => {
         exportToPDF();
+    });
+    
+    // Hide tooltip when clicking elsewhere
+    document.addEventListener('click', (e) => {
+        // Don't hide if clicking on a name cell (handled by nameCell click handler)
+        if (!e.target.closest('.col-name')) {
+            const tooltip = document.getElementById('workerTooltip');
+            if (tooltip) {
+                tooltip.style.display = 'none';
+                currentTooltipElement = null;
+            }
+        }
     });
 }
 
