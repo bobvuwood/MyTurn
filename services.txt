@@ -1,0 +1,11 @@
+P-Pedicure(1)
+M-Manicure(1/2)
+G-Gel Manicure(1)
+PG-Pedicure Gel(1)
+F-Fill(1/2)
+D-Dip(1)
+DM-Deluxe Manicure(1/2)
+LM-Luxury Manicure(1)
+JM-Jelly Manicure(1)
+FS-Full Set(1/2)
+
