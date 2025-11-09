@@ -113,66 +113,291 @@ function renderSchedule() {
             nameCell.title = serviceCodes;
         }
         
-        nameCell.contentEditable = true;
+        // Set contentEditable based on whether name is entered
+        if (nameValue) {
+            // Name is entered - make it read-only
+            nameCell.contentEditable = false;
+            nameCell.style.cursor = 'pointer';
+        } else {
+            // No name - allow editing
+            nameCell.contentEditable = true;
+        }
+        
+        // Track double-click to prevent tooltip from showing
+        let doubleClickOccurred = false;
+        let clickTimeout = null;
+        
+        // Double-click to edit (works for any name, correct or incorrect)
+        nameCell.addEventListener('dblclick', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            doubleClickOccurred = true;
+            
+            // Clear any pending click timeout
+            if (clickTimeout) {
+                clearTimeout(clickTimeout);
+                clickTimeout = null;
+            }
+            
+            // Hide tooltip if showing
+            const tooltip = document.getElementById('workerTooltip');
+            if (tooltip) {
+                tooltip.style.display = 'none';
+                currentTooltipElement = null;
+            }
+            
+            nameCell.contentEditable = true;
+            nameCell.style.cursor = 'text';
+            nameCell.focus();
+            // Select all text for easy editing
+            const range = document.createRange();
+            range.selectNodeContents(nameCell);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+        });
+        
+        // Create autocomplete dropdown
+        const autocompleteDropdown = document.createElement('div');
+        autocompleteDropdown.className = 'autocomplete-dropdown';
+        autocompleteDropdown.style.display = 'none';
+        nameCell.appendChild(autocompleteDropdown);
+        
+        let selectedIndex = -1;
+        let filteredWorkers = [];
+        
+        // Function to filter workers based on input
+        function filterWorkers(input) {
+            // Get text content and clean it up
+            let searchText = '';
+            if (typeof input === 'string') {
+                searchText = input.toLowerCase().trim();
+            } else if (input && input.textContent !== undefined) {
+                searchText = input.textContent.toLowerCase().trim();
+            } else {
+                searchText = String(input || '').toLowerCase().trim();
+            }
+            
+            if (!searchText) {
+                return [];
+            }
+            
+            return Object.keys(workers).filter(name => 
+                name.toLowerCase().startsWith(searchText)
+            ).sort();
+        }
+        
+        // Function to show autocomplete dropdown
+        function showAutocomplete(input) {
+            // Get the current text from the cell
+            const currentText = nameCell.textContent || '';
+            filteredWorkers = filterWorkers(currentText);
+            selectedIndex = -1;
+            
+            if (filteredWorkers.length === 0) {
+                autocompleteDropdown.style.display = 'none';
+                return;
+            }
+            
+            // Clear and populate dropdown
+            autocompleteDropdown.innerHTML = '';
+            filteredWorkers.forEach((workerName, index) => {
+                const item = document.createElement('div');
+                item.className = 'autocomplete-item';
+                item.textContent = workerName;
+                item.addEventListener('click', () => {
+                    nameCell.textContent = workerName;
+                    nameCell.blur();
+                });
+                item.addEventListener('mouseenter', () => {
+                    selectedIndex = index;
+                    updateAutocompleteSelection();
+                });
+                autocompleteDropdown.appendChild(item);
+            });
+            
+            // Position dropdown
+            const rect = nameCell.getBoundingClientRect();
+            autocompleteDropdown.style.left = '0';
+            autocompleteDropdown.style.top = `${rect.height}px`;
+            autocompleteDropdown.style.width = `${rect.width}px`;
+            autocompleteDropdown.style.display = 'block';
+        }
+        
+        // Function to update selected item in dropdown
+        function updateAutocompleteSelection() {
+            const items = autocompleteDropdown.querySelectorAll('.autocomplete-item');
+            items.forEach((item, index) => {
+                if (index === selectedIndex) {
+                    item.classList.add('selected');
+                    // Scroll into view
+                    item.scrollIntoView({ block: 'nearest' });
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+        }
+        
+        // Function to hide autocomplete dropdown
+        function hideAutocomplete() {
+            autocompleteDropdown.style.display = 'none';
+            selectedIndex = -1;
+            filteredWorkers = [];
+        }
+        
+        nameCell.addEventListener('input', (e) => {
+            // Use requestAnimationFrame to ensure textContent is updated
+            requestAnimationFrame(() => {
+                const currentText = nameCell.textContent || '';
+                showAutocomplete(currentText);
+            });
+        });
+        
         nameCell.addEventListener('blur', (e) => {
+            // Delay hiding to allow click on dropdown item
+            setTimeout(() => {
+                hideAutocomplete();
+            }, 200);
+            
             const name = e.target.textContent.trim();
-            saveRowName(rowNumber, name);
+            const previousName = storedData.name || '';
+            
+            // Auto-complete if there's a single match
+            if (name && filteredWorkers.length === 1 && name.toLowerCase() === filteredWorkers[0].toLowerCase()) {
+                e.target.textContent = filteredWorkers[0];
+                saveRowName(rowNumber, filteredWorkers[0]);
+            } else {
+                saveRowName(rowNumber, name);
+            }
+            
+            // Auto-populate Time In if name is entered and Time In is empty
+            const finalName = e.target.textContent.trim();
+            if (finalName && !previousName) {
+                // Name was just entered (was empty before)
+                const timeInput = row.querySelector('.col-time input[type="time"]');
+                if (timeInput && !timeInput.value) {
+                    // Get current time in HH:MM format
+                    const now = new Date();
+                    const hours = String(now.getHours()).padStart(2, '0');
+                    const minutes = String(now.getMinutes()).padStart(2, '0');
+                    const currentTime = `${hours}:${minutes}`;
+                    timeInput.value = currentTime;
+                    saveTimeIn(rowNumber, currentTime);
+                }
+            }
+            
+            // Make read-only if name is entered, otherwise keep editable
+            if (finalName) {
+                e.target.contentEditable = false;
+                e.target.style.cursor = 'pointer';
+            } else {
+                e.target.contentEditable = true;
+                e.target.style.cursor = 'text';
+            }
+            
             // Update highlight if name matches highlighted workers
-            if (name && highlightedWorkers.has(name)) {
+            if (finalName && highlightedWorkers.has(finalName)) {
                 e.target.classList.add('highlighted');
             } else {
                 e.target.classList.remove('highlighted');
             }
             // Update tooltip
-            if (name && workers[name]) {
-                const serviceCodes = workers[name].join(', ');
+            if (finalName && workers[finalName]) {
+                const serviceCodes = workers[finalName].join(', ');
                 e.target.title = serviceCodes;
             } else {
                 e.target.title = '';
             }
         });
+        
+        // Single click for tooltip (only if cell is read-only and name exists in workers)
         nameCell.addEventListener('click', (e) => {
             e.stopPropagation(); // Prevent event from bubbling to document
+            
             const name = nameCell.textContent.trim();
-            if (name && workers[name]) {
-                const serviceCodes = workers[name].join(', ');
-                const tooltip = document.getElementById('workerTooltip');
-                
-                // If clicking the same cell, toggle tooltip
-                if (currentTooltipElement === nameCell) {
-                    tooltip.style.display = 'none';
-                    currentTooltipElement = null;
-                } else {
-                    // Show tooltip for this worker
-                    tooltip.textContent = serviceCodes;
-                    tooltip.style.display = 'block';
-                    
-                    // Position tooltip near the clicked cell
-                    const rect = nameCell.getBoundingClientRect();
-                    tooltip.style.left = `${rect.right + 10}px`;
-                    tooltip.style.top = `${rect.top}px`;
-                    
-                    // Adjust if tooltip goes off screen
-                    setTimeout(() => {
-                        const tooltipRect = tooltip.getBoundingClientRect();
-                        if (tooltipRect.right > window.innerWidth) {
-                            tooltip.style.left = `${rect.left - tooltipRect.width - 10}px`;
-                        }
-                        if (tooltipRect.bottom > window.innerHeight) {
-                            tooltip.style.top = `${window.innerHeight - tooltipRect.height - 10}px`;
-                        }
-                    }, 0);
-                    
-                    currentTooltipElement = nameCell;
+            
+            // Only show tooltip if cell is read-only (name is entered and not currently being edited)
+            if (name && !nameCell.contentEditable) {
+                // Use timeout to distinguish single click from double-click
+                if (clickTimeout) {
+                    clearTimeout(clickTimeout);
                 }
-            } else if (name) {
+                
+                clickTimeout = setTimeout(() => {
+                    // Only show tooltip if it wasn't a double-click
+                    if (!doubleClickOccurred) {
+                        if (name && workers[name]) {
+                            const serviceCodes = workers[name].join(', ');
+                            const tooltip = document.getElementById('workerTooltip');
+                            
+                            if (tooltip) {
+                                // If clicking the same cell, toggle tooltip
+                                if (currentTooltipElement === nameCell) {
+                                    tooltip.style.display = 'none';
+                                    currentTooltipElement = null;
+                                } else {
+                                    // Show tooltip for this worker
+                                    tooltip.textContent = serviceCodes;
+                                    tooltip.style.display = 'block';
+                                    
+                                    // Position tooltip near the clicked cell
+                                    const rect = nameCell.getBoundingClientRect();
+                                    tooltip.style.left = `${rect.right + 10}px`;
+                                    tooltip.style.top = `${rect.top}px`;
+                                    
+                                    // Adjust if tooltip goes off screen
+                                    setTimeout(() => {
+                                        const tooltipRect = tooltip.getBoundingClientRect();
+                                        if (tooltipRect.right > window.innerWidth) {
+                                            tooltip.style.left = `${rect.left - tooltipRect.width - 10}px`;
+                                        }
+                                        if (tooltipRect.bottom > window.innerHeight) {
+                                            tooltip.style.top = `${window.innerHeight - tooltipRect.height - 10}px`;
+                                        }
+                                    }, 0);
+                                    
+                                    currentTooltipElement = nameCell;
+                                }
+                            }
+                        } else if (name) {
+                            // Name doesn't exist in workers, just toggle highlight
+                            toggleHighlight(name);
+                        }
+                    }
+                    
+                    // Reset flag after processing
+                    doubleClickOccurred = false;
+                    clickTimeout = null;
+                }, 250); // Wait 250ms to detect double-click
+            } else if (name && !nameCell.contentEditable) {
                 toggleHighlight(name);
             }
         });
         nameCell.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                e.target.blur();
+                // If dropdown is visible and item is selected, use that
+                if (autocompleteDropdown.style.display === 'block' && selectedIndex >= 0 && filteredWorkers[selectedIndex]) {
+                    nameCell.textContent = filteredWorkers[selectedIndex];
+                    nameCell.blur();
+                } else {
+                    nameCell.blur();
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (autocompleteDropdown.style.display === 'block' && filteredWorkers.length > 0) {
+                    selectedIndex = Math.min(selectedIndex + 1, filteredWorkers.length - 1);
+                    updateAutocompleteSelection();
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (autocompleteDropdown.style.display === 'block' && filteredWorkers.length > 0) {
+                    selectedIndex = Math.max(selectedIndex - 1, -1);
+                    updateAutocompleteSelection();
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                hideAutocomplete();
             }
         });
         row.appendChild(nameCell);
@@ -331,20 +556,10 @@ function renderSchedule() {
                 let code = e.target.textContent.trim().toUpperCase();
                 const originalValue = e.target.dataset.originalValue || '';
                 
-                // If code is empty but there was original data, restore it
-                if (!code && originalValue) {
-                    code = originalValue.toUpperCase();
-                }
-                
-                // Only update if the value actually changed
-                if (code !== originalValue.toUpperCase()) {
-                    e.target.textContent = code; // Update display immediately with capitalized version
-                    handleServiceInput(rowNumber, i, code, 'top');
-                    renderSchedule(); // Re-render to update display
-                } else {
-                    // Value didn't change, just update display to ensure capitalization
-                    e.target.textContent = code;
-                }
+                // Always update - allow clearing if user deleted content
+                e.target.textContent = code; // Update display immediately with capitalized version
+                handleServiceInput(rowNumber, i, code, 'top');
+                renderSchedule(); // Re-render to update display
             });
             topHalf.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
@@ -391,22 +606,11 @@ function renderSchedule() {
             });
             bottomHalf.addEventListener('blur', (e) => {
                 let code = e.target.textContent.trim().toUpperCase();
-                const originalValue = e.target.dataset.originalValue || '';
                 
-                // If code is empty but there was original data, restore it
-                if (!code && originalValue) {
-                    code = originalValue.toUpperCase();
-                }
-                
-                // Only update if the value actually changed
-                if (code !== originalValue.toUpperCase()) {
-                    e.target.textContent = code; // Update display immediately with capitalized version
-                    handleServiceInput(rowNumber, i, code, 'bottom');
-                    renderSchedule(); // Re-render to update display
-                } else {
-                    // Value didn't change, just update display to ensure capitalization
-                    e.target.textContent = code;
-                }
+                // Always update - allow clearing if user deleted content
+                e.target.textContent = code; // Update display immediately with capitalized version
+                handleServiceInput(rowNumber, i, code, 'bottom');
+                renderSchedule(); // Re-render to update display
             });
             bottomHalf.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
@@ -482,6 +686,17 @@ function handleServiceInput(rowNumber, columnNumber, serviceCode, half) {
         return;
     }
     
+    // Validate: Check if worker can perform this service
+    const workerName = scheduleData[rowKey].name ? scheduleData[rowKey].name.trim() : '';
+    if (workerName && workers[workerName]) {
+        if (!workers[workerName].includes(serviceCode)) {
+            // Worker cannot perform this service - show error and prevent saving
+            alert(`${workerName} cannot perform service ${serviceCode}. Available services: ${workers[workerName].join(', ')}`);
+            renderSchedule(); // Re-render to restore previous value
+            return;
+        }
+    }
+    
     // Check if service exists and get its duration
     if (services[serviceCode]) {
         const duration = services[serviceCode].duration;
@@ -518,7 +733,6 @@ function handleServiceInput(rowNumber, columnNumber, serviceCode, half) {
     saveScheduleToStorage();
     
     // After service code is entered, unhighlight the worker and reset the Service dropdown
-    const workerName = scheduleData[rowKey].name ? scheduleData[rowKey].name.trim() : '';
     if (workerName && highlightedWorkers.has(workerName)) {
         highlightedWorkers.delete(workerName);
         saveHighlightsToStorage();
