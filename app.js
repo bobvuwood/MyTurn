@@ -516,6 +516,24 @@ function handleServiceInput(rowNumber, columnNumber, serviceCode, half) {
     }
     
     saveScheduleToStorage();
+    
+    // After service code is entered, unhighlight the worker and reset the Service dropdown
+    const workerName = scheduleData[rowKey].name ? scheduleData[rowKey].name.trim() : '';
+    if (workerName && highlightedWorkers.has(workerName)) {
+        highlightedWorkers.delete(workerName);
+        saveHighlightsToStorage();
+    }
+    
+    // Reset Service dropdown
+    selectedService = '';
+    const serviceSelect = document.getElementById('serviceSelect');
+    if (serviceSelect) {
+        serviceSelect.value = '';
+    }
+    localStorage.setItem('selectedService', '');
+    
+    // Re-render to update highlights
+    renderSchedule();
 }
 
 // Save service assignment (legacy function, redirects to handleServiceInput)

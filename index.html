@@ -11,12 +11,9 @@
 <body>
     <div class="container">
         <div class="header-section">
-            <div class="date-display" id="dateDisplay">SAT 5/14</div>
             <h1 class="schedule-title">DAILY WORK SCHEDULE</h1>
             <div class="date-input-section">
-                <button class="btn-nav" id="prevDayBtn" title="Previous Day">
-                    <span class="arrow">←</span>
-                </button>
+                <div class="date-display" id="dateDisplay">SAT 5/14</div>
                 <div class="service-controls">
                     <label for="serviceSelect">Service:</label>
                     <select id="serviceSelect" class="service-select">
@@ -27,6 +24,9 @@
                 <div class="export-controls">
                     <button class="btn-export" id="exportPdfBtn" title="Export to PDF">
                         <span class="export-icon">📄</span> Export PDF
+                    </button>
+                    <button class="btn-nav" id="prevDayBtn" title="Previous Day">
+                        <span class="arrow">←</span>
                     </button>
                 </div>
                 <button class="btn-nav" id="nextDayBtn" title="Next Day">
