@@ -12,27 +12,8 @@ const services = {
     'FS': { name: 'Full Set', duration: 30 }
 };
 
-// Workers data - mapping names to their available services
-const workers = {
-    'Amanda': ['P', 'M', 'G', 'PG'],
-    'Ana': ['P', 'M'],
-    'Annie': ['P'],
-    'Heidi': ['P', 'M', 'G', 'PG'],
-    'Helen': ['P', 'M'],
-    'Jasmine': ['P', 'M', 'G', 'D', 'PG'],
-    'Kathy': ['P'],
-    'Lan': ['P', 'PG', 'M'],
-    'Lucy': ['P', 'M', 'G', 'PG'],
-    'Mimi': ['P', 'M', 'G', 'PG'],
-    'Sally': ['P', 'M', 'G', 'PG'],
-    'May': ['P', 'M', 'G', 'D', 'F', 'FS', 'PG'],
-    'Joy': ['M', 'G', 'D', 'F', 'FS'],
-    'Kathlyn': ['M', 'G', 'D', 'F', 'FS'],
-    'Lily': ['M', 'G', 'D', 'F', 'FS', 'P', 'PG'],
-    'Angela': ['M', 'G', 'D', 'F', 'FS'],
-    'Natalie': ['M', 'G', 'D', 'F', 'FS'],
-    'Lynn': ['M', 'G', 'P', 'PG']
-};
+// Workers data will be loaded from localStorage or use defaults
+// See loadWorkers() function below
 
 // Application state
 let highlightedWorkers = new Set();
@@ -40,6 +21,47 @@ let scheduleData = {}; // Store time in and service assignments
 let selectedService = '';
 let currentDate = new Date();
 let currentTooltipElement = null; // Track which element's tooltip is currently shown
+
+// Load workers from localStorage or use default
+function loadWorkers() {
+    const stored = localStorage.getItem('myTurnWorkers');
+    if (stored) {
+        try {
+            return JSON.parse(stored);
+        } catch (e) {
+            console.error('Error parsing workers from localStorage:', e);
+        }
+    }
+    // Return default workers if nothing in storage
+    return {
+        'Amanda': ['P', 'M', 'G', 'PG'],
+        'Ana': ['P', 'M'],
+        'Annie': ['P'],
+        'Heidi': ['P', 'M', 'G', 'PG'],
+        'Helen': ['P', 'M'],
+        'Jasmine': ['P', 'M', 'G', 'D', 'PG'],
+        'Kathy': ['P'],
+        'Lan': ['P', 'PG', 'M'],
+        'Lucy': ['P', 'M', 'G', 'PG'],
+        'Mimi': ['P', 'M', 'G', 'PG'],
+        'Sally': ['P', 'M', 'G', 'PG'],
+        'May': ['P', 'M', 'G', 'D', 'F', 'FS', 'PG'],
+        'Joy': ['M', 'G', 'D', 'F', 'FS'],
+        'Kathlyn': ['M', 'G', 'D', 'F', 'FS'],
+        'Lily': ['M', 'G', 'D', 'F', 'FS', 'P', 'PG'],
+        'Angela': ['M', 'G', 'D', 'F', 'FS'],
+        'Natalie': ['M', 'G', 'D', 'F', 'FS'],
+        'Lynn': ['M', 'G', 'P', 'PG']
+    };
+}
+
+// Save workers to localStorage
+function saveWorkers() {
+    localStorage.setItem('myTurnWorkers', JSON.stringify(workers));
+}
+
+// Initialize workers from storage
+let workers = loadWorkers();
 
 // Initialize the application
 function init() {
@@ -1096,6 +1118,23 @@ function setupEventListeners() {
         exportToPDF();
     });
     
+    // Manage Workers button
+    document.getElementById('manageWorkersBtn').addEventListener('click', () => {
+        showWorkersDialog();
+    });
+    
+    // Close Workers Dialog button
+    document.getElementById('closeWorkersDialog').addEventListener('click', () => {
+        hideWorkersDialog();
+    });
+    
+    // Close dialog when clicking outside
+    document.getElementById('workersDialog').addEventListener('click', (e) => {
+        if (e.target.id === 'workersDialog') {
+            hideWorkersDialog();
+        }
+    });
+    
     // Hide tooltip when clicking elsewhere
     document.addEventListener('click', (e) => {
         // Don't hide if clicking on a name cell (handled by nameCell click handler)
@@ -1166,6 +1205,140 @@ function exportToPDF() {
         exportBtn.innerHTML = originalText;
         exportBtn.disabled = false;
     });
+}
+
+// Show Workers Management Dialog
+function showWorkersDialog() {
+    const dialog = document.getElementById('workersDialog');
+    renderWorkersTable();
+    dialog.style.display = 'flex';
+}
+
+// Hide Workers Management Dialog
+function hideWorkersDialog() {
+    const dialog = document.getElementById('workersDialog');
+    dialog.style.display = 'none';
+}
+
+// Render workers table in dialog
+function renderWorkersTable() {
+    const tbody = document.getElementById('workersTableBody');
+    tbody.innerHTML = '';
+    
+    // Render existing workers, sorted by name
+    Object.entries(workers)
+        .sort(([nameA], [nameB]) => nameA.localeCompare(nameB))
+        .forEach(([name, skills]) => {
+            const row = createWorkerRow(name, skills);
+            tbody.appendChild(row);
+        });
+}
+
+// Create a worker row
+function createWorkerRow(name = '', skills = []) {
+    const row = document.createElement('tr');
+    
+    // Name cell
+    const nameCell = document.createElement('td');
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'worker-name-input';
+    nameInput.value = name;
+    nameInput.placeholder = 'Worker name';
+    nameInput.addEventListener('blur', () => {
+        const oldName = nameInput.dataset.originalName || '';
+        const newName = nameInput.value.trim();
+        
+        if (newName && newName !== oldName) {
+            // If name changed, update workers object
+            if (oldName && workers[oldName]) {
+                // Rename worker
+                const skillsArray = workers[oldName];
+                delete workers[oldName];
+                workers[newName] = skillsArray;
+            } else if (!oldName) {
+                // New worker
+                const skillsStr = row.querySelector('.worker-skills-input').value.trim();
+                const skillsArray = skillsStr ? skillsStr.split(',').map(s => s.trim().toUpperCase()).filter(s => s) : [];
+                workers[newName] = skillsArray;
+            }
+            nameInput.dataset.originalName = newName;
+            saveWorkers();
+            renderSchedule(); // Update schedule to reflect worker changes
+        } else if (!newName && oldName) {
+            // Name was cleared, restore it
+            nameInput.value = oldName;
+        }
+    });
+    nameInput.addEventListener('focus', () => {
+        nameInput.dataset.originalName = nameInput.value.trim();
+    });
+    nameInput.dataset.originalName = name;
+    nameCell.appendChild(nameInput);
+    row.appendChild(nameCell);
+    
+    // Skills cell
+    const skillsCell = document.createElement('td');
+    const skillsInput = document.createElement('input');
+    skillsInput.type = 'text';
+    skillsInput.className = 'worker-skills-input';
+    skillsInput.value = Array.isArray(skills) ? skills.join(', ') : skills;
+    skillsInput.placeholder = 'P, M, G, PG';
+    skillsInput.addEventListener('blur', () => {
+        const workerName = row.querySelector('.worker-name-input').value.trim();
+        if (workerName) {
+            const skillsStr = skillsInput.value.trim();
+            const skillsArray = skillsStr ? skillsStr.split(',').map(s => s.trim().toUpperCase()).filter(s => s) : [];
+            workers[workerName] = skillsArray;
+            saveWorkers();
+            renderSchedule(); // Update schedule to reflect worker changes
+        }
+    });
+    skillsCell.appendChild(skillsInput);
+    row.appendChild(skillsCell);
+    
+    // Action cell
+    const actionCell = document.createElement('td');
+    actionCell.style.textAlign = 'center';
+    
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-add-worker';
+    addBtn.innerHTML = '+';
+    addBtn.title = 'Add new worker';
+    addBtn.addEventListener('click', () => {
+        const tbody = document.getElementById('workersTableBody');
+        const newRow = createWorkerRow('', []);
+        tbody.appendChild(newRow);
+        // Focus on the name input of the new row
+        setTimeout(() => {
+            newRow.querySelector('.worker-name-input').focus();
+        }, 0);
+    });
+    
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn-delete-worker';
+    deleteBtn.innerHTML = '×';
+    deleteBtn.title = 'Delete worker';
+    deleteBtn.addEventListener('click', () => {
+        const workerName = row.querySelector('.worker-name-input').value.trim();
+        if (workerName && workers[workerName]) {
+            if (confirm(`Are you sure you want to delete worker "${workerName}"?`)) {
+                delete workers[workerName];
+                saveWorkers();
+                row.remove();
+                renderSchedule(); // Update schedule to reflect worker deletion
+            }
+        } else {
+            // New row that hasn't been saved yet, just remove it
+            row.remove();
+        }
+    });
+    
+    actionCell.appendChild(addBtn);
+    actionCell.appendChild(deleteBtn);
+    row.appendChild(actionCell);
+    
+    return row;
 }
 
 // Initialize on page load

@@ -100,8 +100,38 @@ body {
     gap: 10px;
 }
 
+.btn-manage {
+    padding: 8px 12px;
+    background: #17a2b8;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: 500;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+}
+
+.btn-manage:hover {
+    background: #138496;
+    transform: scale(1.05);
+}
+
+.btn-manage:active {
+    background: #117a8b;
+}
+
+.manage-icon {
+    font-size: 1.5em;
+}
+
 .btn-export {
-    padding: 8px 16px;
+    padding: 8px 12px;
     background: #28a745;
     color: white;
     border: none;
@@ -112,8 +142,9 @@ body {
     transition: all 0.3s;
     display: flex;
     align-items: center;
-    gap: 6px;
-    white-space: nowrap;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
 }
 
 .btn-export:hover {
@@ -126,7 +157,9 @@ body {
 }
 
 .export-icon {
-    font-size: 1.1em;
+    width: 28px;
+    height: 28px;
+    display: block;
 }
 
 .date-input-section label {
@@ -268,6 +301,154 @@ body {
 
 .autocomplete-item:last-child {
     border-bottom: none;
+}
+
+/* Workers Management Dialog */
+.workers-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dialog-content {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    max-width: 800px;
+    width: 90%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.dialog-header {
+    padding: 20px;
+    border-bottom: 2px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dialog-header h2 {
+    margin: 0;
+    font-size: 1.5em;
+}
+
+.dialog-close {
+    background: none;
+    border: none;
+    font-size: 2em;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.dialog-close:hover {
+    color: #333;
+}
+
+.dialog-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.workers-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.workers-table th {
+    background: #f8f9fa;
+    padding: 12px;
+    text-align: left;
+    font-weight: bold;
+    border-bottom: 2px solid #333;
+}
+
+.workers-table td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.workers-table .col-worker-name {
+    width: 150px;
+}
+
+.workers-table .col-worker-skills {
+    width: auto;
+    flex: 1;
+}
+
+.workers-table .col-worker-action {
+    width: 150px;
+    text-align: center;
+}
+
+.worker-name-input,
+.worker-skills-input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.worker-name-input:focus,
+.worker-skills-input:focus {
+    outline: 2px solid #667eea;
+    border-color: #667eea;
+}
+
+.btn-add-worker,
+.btn-delete-worker {
+    padding: 0;
+    border: 2px solid;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.2em;
+    margin: 0 3px;
+    transition: all 0.2s;
+    line-height: 1;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.btn-add-worker {
+    background: #007bff;
+    border-color: #007bff;
+}
+
+.btn-add-worker:hover {
+    background: #0056b3;
+    border-color: #0056b3;
+}
+
+.btn-delete-worker {
+    background: #dc3545;
+    border-color: #dc3545;
+}
+
+.btn-delete-worker:hover {
+    background: #c82333;
+    border-color: #c82333;
 }
 
 .schedule-table td.col-name.highlighted {

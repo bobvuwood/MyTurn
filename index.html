@@ -19,11 +19,26 @@
                     <select id="serviceSelect" class="service-select">
                         <option value="">-- Select Service --</option>
                     </select>
-                    <button class="btn-next" id="nextWorkerBtn">Next</button>
+                    <button class="btn-next" id="nextWorkerBtn" title="Next Worker">↓</button>
                 </div>
                 <div class="export-controls">
                     <button class="btn-export" id="exportPdfBtn" title="Export to PDF">
-                        <span class="export-icon">📄</span> Export PDF
+                        <svg class="export-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <!-- Document body -->
+                            <path d="M5 3C5 2.44772 5.44772 2 6 2H14L19 7V21C19 21.5523 18.5523 22 18 22H6C5.44772 22 5 21.5523 5 21V3Z" fill="#DC3545" stroke="#DC3545" stroke-width="1.5"/>
+                            <!-- Folded corner -->
+                            <path d="M14 2V7H19L14 2Z" fill="#DC3545" stroke="#DC3545" stroke-width="1.5"/>
+                            <!-- PDF label bar -->
+                            <rect x="7" y="8" width="10" height="4" fill="#DC3545" rx="0.5"/>
+                            <!-- PDF text -->
+                            <text x="12" y="11" font-family="Arial, sans-serif" font-size="5" font-weight="bold" fill="white" text-anchor="middle" dominant-baseline="middle">PDF</text>
+                            <!-- Download arrow - triangular head and stem -->
+                            <path d="M10 14L12 17L14 14Z" fill="#DC3545"/>
+                            <rect x="11.5" y="17" width="1" height="1.5" fill="#DC3545"/>
+                        </svg>
+                    </button>
+                    <button class="btn-manage" id="manageWorkersBtn" title="Manage Workers">
+                        <span class="manage-icon">👥</span>
                     </button>
                     <button class="btn-nav" id="prevDayBtn" title="Previous Day">
                         <span class="arrow">←</span>
@@ -36,6 +51,30 @@
         </div>
 
         <div id="workerTooltip" class="worker-tooltip" style="display: none;"></div>
+
+        <!-- Workers Management Dialog -->
+        <div id="workersDialog" class="workers-dialog" style="display: none;">
+            <div class="dialog-content">
+                <div class="dialog-header">
+                    <h2>Manage Workers</h2>
+                    <button class="dialog-close" id="closeWorkersDialog">&times;</button>
+                </div>
+                <div class="dialog-body">
+                    <table class="workers-table">
+                        <thead>
+                            <tr>
+                                <th class="col-worker-name">Name</th>
+                                <th class="col-worker-skills">Skills</th>
+                                <th class="col-worker-action">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="workersTableBody">
+                            <!-- Rows will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
 
         <div class="schedule-container">
             <table class="schedule-table">
