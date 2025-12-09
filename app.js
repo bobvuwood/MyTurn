@@ -3,13 +3,16 @@ const services = {
     'P': { name: 'Pedicure', duration: 60 },
     'M': { name: 'Manicure', duration: 30 },
     'G': { name: 'Gel Manicure', duration: 60 },
+    'GX': { name: 'GelX', duration: 60 },
     'PG': { name: 'Pedicure Gel', duration: 60 },
     'F': { name: 'Fill', duration: 30 },
     'D': { name: 'Dip', duration: 60 },
     'DM': { name: 'Deluxe Manicure', duration: 30 },
     'LM': { name: 'Luxury Manicure', duration: 60 },
     'JM': { name: 'Jelly Manicure', duration: 60 },
-    'FS': { name: 'Full Set', duration: 30 }
+    'FS': { name: 'Full Set', duration: 30 },
+    'X': { name: 'Skip Turn', duration: 60 }
+
 };
 
 // Workers data will be loaded from localStorage or use defaults
@@ -34,24 +37,24 @@ function loadWorkers() {
     }
     // Return default workers if nothing in storage
     return {
-        'Amanda': ['P', 'M', 'G', 'PG'],
-        'Ana': ['P', 'M'],
-        'Annie': ['P'],
-        'Heidi': ['P', 'M', 'G', 'PG'],
-        'Helen': ['P', 'M'],
-        'Jasmine': ['P', 'M', 'G', 'D', 'PG'],
-        'Kathy': ['P'],
-        'Lan': ['P', 'PG', 'M'],
-        'Lucy': ['P', 'M', 'G', 'PG'],
-        'Mimi': ['P', 'M', 'G', 'PG'],
-        'Sally': ['P', 'M', 'G', 'PG'],
-        'May': ['P', 'M', 'G', 'D', 'F', 'FS', 'PG'],
-        'Joy': ['M', 'G', 'D', 'F', 'FS'],
-        'Kathlyn': ['M', 'G', 'D', 'F', 'FS'],
-        'Lily': ['M', 'G', 'D', 'F', 'FS', 'P', 'PG'],
-        'Angela': ['M', 'G', 'D', 'F', 'FS'],
-        'Natalie': ['M', 'G', 'D', 'F', 'FS'],
-        'Lynn': ['M', 'G', 'P', 'PG']
+        'Amanda': ['X', 'P', 'M', 'G', 'PG'],
+        'Ana': ['X', 'P', 'M'],
+        'Annie': ['X', 'P'],
+        'Heidi': ['X', 'P', 'M', 'G', 'PG'],
+        'Helen': ['X', 'P', 'M'],
+        'Jasmine': ['X', 'P', 'M', 'G', 'D', 'PG'],
+        'Kathy': ['X', 'P'],
+        'Lan': ['X', 'P', 'PG', 'M'],
+        'Lucy': ['X', 'P', 'M', 'G', 'PG'],
+        'Mimi': ['X', 'P', 'M', 'G', 'PG'],
+        'Sally': ['X', 'P', 'M', 'G', 'PG'],
+        'May': ['X', 'P', 'M', 'G', 'D', 'F', 'FS', 'PG'],
+        'Joy': ['X', 'M', 'G', 'D', 'F', 'FS'],
+        'Kathlyn': ['X', 'M', 'G', 'D', 'F', 'FS'],
+        'Lily': ['X', 'M', 'G', 'D', 'F', 'FS', 'P', 'PG'],
+        'Angela': ['X', 'M', 'G', 'D', 'F', 'FS'],
+        'Natalie': ['X', 'M', 'G', 'D', 'F', 'FS'],
+        'Lynn': ['X', 'M', 'G', 'P', 'PG']
     };
 }
 
@@ -188,6 +191,35 @@ function renderSchedule() {
         let selectedIndex = -1;
         let filteredWorkers = [];
         
+        // Helper function to get only the text content of the cell (excluding dropdown)
+        function getCellTextContent() {
+            // Get all direct child nodes that are text nodes only (exclude all element nodes)
+            // This ensures we don't include any text from the dropdown or other child elements
+            let text = '';
+            for (let node of nameCell.childNodes) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    text += node.textContent;
+                }
+                // Explicitly skip all element nodes (including dropdown)
+            }
+            return text.trim();
+        }
+        
+        // Function to get workers already assigned in other rows
+        function getAssignedWorkers(excludeRowNumber) {
+            const assigned = new Set();
+            for (let r = 1; r <= 30; r++) {
+                if (r === excludeRowNumber) continue; // Skip current row
+                const rowKey = `row${r}`;
+                const storedData = scheduleData[rowKey] || {};
+                const workerName = storedData.name ? storedData.name.trim() : '';
+                if (workerName) {
+                    assigned.add(workerName);
+                }
+            }
+            return assigned;
+        }
+        
         // Function to filter workers based on input
         function filterWorkers(input) {
             // Get text content and clean it up
@@ -200,19 +232,29 @@ function renderSchedule() {
                 searchText = String(input || '').toLowerCase().trim();
             }
             
+            // Get workers already assigned in other rows
+            const assignedWorkers = getAssignedWorkers(rowNumber);
+            
+            // Get all available workers (excluding already assigned ones)
+            let availableWorkers = Object.keys(workers).filter(name => 
+                !assignedWorkers.has(name)
+            );
+            
+            // If no search text, return all available workers
             if (!searchText) {
-                return [];
+                return availableWorkers.sort();
             }
             
-            return Object.keys(workers).filter(name => 
+            // Filter by search text
+            return availableWorkers.filter(name => 
                 name.toLowerCase().startsWith(searchText)
             ).sort();
         }
         
         // Function to show autocomplete dropdown
         function showAutocomplete(input) {
-            // Get the current text from the cell
-            const currentText = nameCell.textContent || '';
+            // Get the current text from the cell (excluding dropdown)
+            const currentText = typeof input === 'string' ? input : getCellTextContent();
             filteredWorkers = filterWorkers(currentText);
             selectedIndex = -1;
             
@@ -246,6 +288,16 @@ function renderSchedule() {
             autocompleteDropdown.style.display = 'block';
         }
         
+        // Show autocomplete when cell is focused (before typing)
+        nameCell.addEventListener('focus', (e) => {
+            // Only show if cell is editable and empty
+            if (nameCell.contentEditable === 'true' || nameCell.contentEditable === true) {
+                const currentText = getCellTextContent();
+                // Show all workers if cell is empty, otherwise filter based on current text
+                showAutocomplete(currentText);
+            }
+        });
+        
         // Function to update selected item in dropdown
         function updateAutocompleteSelection() {
             const items = autocompleteDropdown.querySelectorAll('.autocomplete-item');
@@ -270,7 +322,7 @@ function renderSchedule() {
         nameCell.addEventListener('input', (e) => {
             // Use requestAnimationFrame to ensure textContent is updated
             requestAnimationFrame(() => {
-                const currentText = nameCell.textContent || '';
+                const currentText = getCellTextContent();
                 showAutocomplete(currentText);
             });
         });
@@ -281,7 +333,14 @@ function renderSchedule() {
                 hideAutocomplete();
             }, 200);
             
-            const name = e.target.textContent.trim();
+            // Get the text content (excluding dropdown)
+            let name = getCellTextContent();
+            
+            // Ensure the cell only contains the name text, not any dropdown elements
+            if (name !== e.target.textContent.trim()) {
+                e.target.textContent = name;
+            }
+            
             const previousName = storedData.name || '';
             
             // Auto-complete if there's a single match
@@ -289,6 +348,10 @@ function renderSchedule() {
                 e.target.textContent = filteredWorkers[0];
                 saveRowName(rowNumber, filteredWorkers[0]);
             } else {
+                // If name is empty or doesn't match, clear it properly
+                if (!name) {
+                    e.target.textContent = '';
+                }
                 saveRowName(rowNumber, name);
             }
             
